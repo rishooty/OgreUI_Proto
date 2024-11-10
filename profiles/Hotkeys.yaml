@@ -1,7 +1,7 @@
 name: "Hotkeys"
 mappings:
-  Hotkey1:
-    Hotkey2:
+  Guide:
+    Start:
       Dpad:
         Up: "^"
         Down: "D"
@@ -17,7 +17,7 @@ mappings:
       South: "D"
       West: "<<"
       East: ">>"
-  Hotkey2:
+  Start:
     Shoulders:
       RB: "^"
       RT: "D"

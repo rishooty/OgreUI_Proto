@@ -1,7 +1,7 @@
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
-from gi.repository import Gtk, GtkLayerShell, Gdk
+from gi.repository import Gtk, GtkLayerShell, Gdk, GLib
 from gi.repository import Pango
 
 class ControllerOverlay:
@@ -79,30 +79,61 @@ class ControllerOverlay:
         return "black" if brightness > 125 else "white"
 
     def update_button_display(self, button_info):
-        # Get the appropriate text color based on background
-        text_color = self.get_contrast_color(button_info['color'])
+        def _update():
+            try:
+                # Get the appropriate text color based on background
+                text_color = self.get_contrast_color(button_info['color'])
 
-        # Create CSS for background color
-        css = f"""
-        window {{
-            background-color: {button_info['color']};
-            border-radius: 10px;
-            padding: 10px;
-        }}
-        """
-        self.style_provider.load_from_data(css.encode())
+                # Create CSS for background color
+                css = f"""
+                window {{
+                    background-color: {button_info['color']};
+                    border-radius: 10px;
+                    padding: 10px;
+                }}
+                """
+                self.style_provider.load_from_data(css.encode())
 
-        # Get and modify the Pango context for font scaling
-        context = self.label.get_pango_context()
-        font = context.get_font_description()
-        font.set_size(48 * Pango.SCALE)  # Scale factor
-        font.set_weight(Pango.Weight.ULTRABOLD)
-        context.set_font_description(font)
+                # Get and modify the Pango context for font scaling
+                context = self.label.get_pango_context()
+                font = context.get_font_description()
+                font.set_size(48 * Pango.SCALE)  # Scale factor
+                font.set_weight(Pango.Weight.ULTRABOLD)
+                context.set_font_description(font)
 
-        # Update label with contrast-appropriate color
-        self.label.set_markup(
-            f"<span color='{text_color}'>{button_info['label']}</span>"
-        )
+                # Update label with contrast-appropriate color, size, and bold text
+                self.label.set_markup(
+                    f'<span color="{text_color}" font_desc="48" weight="bold">{button_info["label"]}</span>'
+                )
+            except Exception as e:
+                print(f"Error in update_button_display: {e}")
+            return False
+
+        # Ensure we're on the main GTK thread
+        if not Gtk.main_level():
+            GLib.idle_add(_update)
+        else:
+            _update()
+
+
+    def update_hotkey_display(self, hotkey_info):
+        if hotkey_info["type"] == "single":
+            self.update_button_display({
+                'color': '#FF00FF',  # Magenta for hotkeys
+                'label': hotkey_info["text"]
+            })
+        elif hotkey_info["type"] in ["dpad", "face", "shoulders"]:
+            # Handle multi-button displays
+            labels = []
+            if "up" in hotkey_info: labels.append(f"↑: {hotkey_info['up']}")
+            if "down" in hotkey_info: labels.append(f"↓: {hotkey_info['down']}")
+            if "left" in hotkey_info: labels.append(f"←: {hotkey_info['left']}")
+            if "right" in hotkey_info: labels.append(f"→: {hotkey_info['right']}")
+
+            self.update_button_display({
+                'color': '#FF00FF',  # Magenta for hotkeys
+                'label': '\n'.join(labels)
+            })
 
     def show(self):
         self.window.show_all()

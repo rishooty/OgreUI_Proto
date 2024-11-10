@@ -1,12 +1,16 @@
 from ui.gtk_overlay import ControllerOverlay
 from controllers.manager import ControllerManager
+from controllers.hotkey_manager import HotkeyManager
 import sdl2
+import sdl2.ext
 from gi.repository import Gtk, GLib
 import threading
+import time
 
 class ControllerOverlayApp:
     def __init__(self, profile_name=None):
         self.controller_manager = ControllerManager(profile_name)
+        self.hotkey_manager = HotkeyManager()  # Add this line
         self.overlays = {}
         self.running = True
 
@@ -22,44 +26,126 @@ class ControllerOverlayApp:
         self.sdl_thread.start()
 
     def sdl_event_loop(self):
-        event = sdl2.SDL_Event()
         while self.running:
-            while sdl2.SDL_PollEvent(event):
+            for event in sdl2.ext.get_events():
                 if event.type == sdl2.SDL_CONTROLLERBUTTONDOWN:
-                    GLib.idle_add(
-                        self.handle_button_press,
-                        event.cbutton.which,
-                        event.cbutton.button
-                    )
-                elif event.type == sdl2.SDL_CONTROLLERAXISMOTION:
-                    # Only process significant axis movement
-                    if abs(event.caxis.value) > 16384:  # Half of max value
-                        GLib.idle_add(
-                            self.handle_axis_motion,
-                            event.caxis.which,
-                            event.caxis.axis,
-                            event.caxis.value
-                        )
-                elif event.type == sdl2.SDL_CONTROLLERDEVICEADDED:
-                    GLib.idle_add(self.check_controllers)
-                elif event.type == sdl2.SDL_CONTROLLERDEVICEREMOVED:
-                    GLib.idle_add(self.remove_controller, event.cdevice.which)
-            sdl2.SDL_Delay(16)
+                    button = event.cbutton.button
+                    joy_id = event.cbutton.which
 
-    def handle_axis_motion(self, joy_id, axis, value):
-        print(f"Axis motion detected: joy_id={joy_id}, axis={axis}, value={value}")
+                    # Check for hotkey combinations first
+                    hotkey_info = self.hotkey_manager.handle_button_event(button, True)
+                    if hotkey_info:
+                        # Update overlay with hotkey information
+                        if joy_id in self.controller_manager.controllers:
+                            controller_data = self.controller_manager.controllers[joy_id]
+                            if controller_data["overlay"]:
+                                controller_data["overlay"].update_hotkey_display(hotkey_info)
+                    elif button == sdl2.SDL_CONTROLLER_BUTTON_GUIDE:
+                        print("Guide button pressed!")
+                        self.handle_guide_press(joy_id)
+                    else:
+                        # Handle regular button press
+                        self.handle_button_press(joy_id, button)
+
+                elif event.type == sdl2.SDL_CONTROLLERBUTTONUP:
+                    button = event.cbutton.button
+                    joy_id = event.cbutton.which
+
+                    # Update hotkey state
+                    hotkey_info = self.hotkey_manager.handle_button_event(button, False)
+                    if hotkey_info:
+                        # Update overlay with new hotkey information
+                        if joy_id in self.controller_manager.controllers:
+                            controller_data = self.controller_manager.controllers[joy_id]
+                            if controller_data["overlay"]:
+                                controller_data["overlay"].update_hotkey_display(hotkey_info)
+                    elif button == sdl2.SDL_CONTROLLER_BUTTON_GUIDE:
+                        print("Guide button released!")
+                        self.handle_guide_release(joy_id)
+                    else:
+                        # Handle regular button release
+                        self.handle_button_release(joy_id, button)
+
+                # Add back axis motion handling
+                elif event.type == sdl2.SDL_CONTROLLERAXISMOTION:
+                    try:
+                        joy_id = event.caxis.which
+                        axis = event.caxis.axis
+                        value = event.caxis.value
+
+                        # Validate the controller exists before processing
+                        if joy_id in self.controller_manager.controllers:
+                            self.handle_axis_motion(joy_id, axis, value)
+                    except Exception as e:
+                        print(f"Error handling axis motion: {e}")
+
+
+    def handle_guide_press(self, joy_id):
+        # Handle guide button specifically
         if joy_id in self.controller_manager.controllers:
             controller_data = self.controller_manager.controllers[joy_id]
             if controller_data["overlay"]:
-                axis_info = self.get_axis_info(
-                    controller_data["type"],
-                    axis,
-                    value > 0
-                )
-                print(f"Axis info: {axis_info}")  # Debug
-                if axis_info:
-                    print(f"Updating overlay with axis info: {axis_info}")  # Debug
-                    controller_data["overlay"].update_button_display(axis_info)
+                button_info = {
+                    'color': '#FF00FF',  # Special color for guide
+                    'label': 'Guide'
+                }
+                controller_data["overlay"].update_button_display(button_info)
+
+    def handle_guide_release(self, joy_id):
+        # Clear guide button display
+        if joy_id in self.controller_manager.controllers:
+            controller_data = self.controller_manager.controllers[joy_id]
+            if controller_data["overlay"]:
+                button_info = {
+                    'color': '#808080',
+                    'label': ''
+                }
+                controller_data["overlay"].update_button_display(button_info)
+
+    def handle_axis_motion(self, joy_id, axis, value):
+        # Add threshold and rate limiting
+        AXIS_THRESHOLD = 16384  # About half of max value (32768)
+
+        try:
+            if abs(value) < AXIS_THRESHOLD:
+                return
+
+            # Add rate limiting using a class variable
+            current_time = time.time()
+            if hasattr(self, '_last_axis_update'):
+                if (current_time - self._last_axis_update) < 0.016:  # ~60fps
+                    return
+            self._last_axis_update = current_time
+
+            print(f"Axis motion detected: joy_id={joy_id}, axis={axis}, value={value}")
+
+            if joy_id in self.controller_manager.controllers:
+                controller_data = self.controller_manager.controllers[joy_id]
+                if controller_data["overlay"] and controller_data["type"]:
+                    axis_info = self.get_axis_info(
+                        controller_data["type"],
+                        axis,
+                        value > 0
+                    )
+                    if axis_info:
+                        # Use GLib.idle_add for thread-safe GUI updates
+                        GLib.idle_add(
+                            self._update_axis_display,
+                            controller_data["overlay"],
+                            axis_info
+                        )
+        except Exception as e:
+            print(f"Error in handle_axis_motion: {e}")
+
+    def _update_axis_display(self, overlay, axis_info):
+        """Thread-safe method to update the overlay"""
+        try:
+            overlay.update_button_display(axis_info)
+        except Exception as e:
+            print(f"Error updating axis display: {e}")
+        return False  # Important: return False to prevent repeated calls
+
+
 
     def get_axis_info(self, controller_type, axis, is_positive):
         profile = self.controller_manager.profiles.get(
@@ -128,6 +214,22 @@ class ControllerOverlayApp:
                 print(f"Updating overlay with: {button_info}")  # Debug
                 controller_data["overlay"].update_button_display(button_info)
 
+    def handle_button_release(self, joy_id, button):
+        print(f"Button release detected: joy_id={joy_id}, button={button}")  # Debug
+        if joy_id in self.controller_manager.controllers:
+            controller_data = self.controller_manager.controllers[joy_id]
+
+            # Only handle release if we have a valid controller type
+            if controller_data["type"] and controller_data["overlay"]:
+                # Clear the button display or show default state
+                button_info = {
+                    'color': '#808080',  # Grey out or use your default color
+                    'label': '',         # Clear the label
+                    'sdl_button': self.get_sdl_button_name(button)  # Optional: for debugging
+                }
+                print(f"Clearing overlay for button: {button_info}")  # Debug
+                controller_data["overlay"].update_button_display(button_info)
+
     # User is prompted to press X, or C if there is no X
     def detect_controller_type(self, button):
         if button == sdl2.SDL_CONTROLLER_BUTTON_X:
@@ -165,20 +267,11 @@ class ControllerOverlayApp:
             sdl2.SDL_CONTROLLER_BUTTON_B: "B",
             sdl2.SDL_CONTROLLER_BUTTON_X: "X",
             sdl2.SDL_CONTROLLER_BUTTON_Y: "Y",
-            sdl2.SDL_CONTROLLER_BUTTON_A: "South",
-            sdl2.SDL_CONTROLLER_BUTTON_B: "East",
-            sdl2.SDL_CONTROLLER_BUTTON_X: "West",
-            sdl2.SDL_CONTROLLER_BUTTON_Y: "North",
-            sdl2.SDL_CONTROLLER_BUTTON_DPAD_UP: "Up",
-            sdl2.SDL_CONTROLLER_BUTTON_DPAD_DOWN: "Down",
-            sdl2.SDL_CONTROLLER_BUTTON_DPAD_LEFT: "Left",
-            sdl2.SDL_CONTROLLER_BUTTON_DPAD_RIGHT: "Right",
-            sdl2.SDL_CONTROLLER_BUTTON_LEFTSHOULDER: "LB",
-            sdl2.SDL_CONTROLLER_AXIS_TRIGGERLEFT: "LT",
-            sdl2.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: "RB",
-            sdl2.SDL_CONTROLLER_AXIS_TRIGGERRIGHT: "RT",
+            sdl2.SDL_CONTROLLER_BUTTON_GUIDE: "Guide",  # Add this
+            sdl2.SDL_CONTROLLER_BUTTON_START: "Start",  # Add this
+            sdl2.SDL_CONTROLLER_BUTTON_BACK: "Back"     # Add this
         }
-        return button_names.get(button, "UNKNOWN")
+        return button_names.get(button)
 
     def run(self):
         try:
