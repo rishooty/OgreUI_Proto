@@ -164,7 +164,19 @@ class ControllerOverlayApp:
             sdl2.SDL_CONTROLLER_BUTTON_A: "A",
             sdl2.SDL_CONTROLLER_BUTTON_B: "B",
             sdl2.SDL_CONTROLLER_BUTTON_X: "X",
-            sdl2.SDL_CONTROLLER_BUTTON_Y: "Y"
+            sdl2.SDL_CONTROLLER_BUTTON_Y: "Y",
+            sdl2.SDL_CONTROLLER_BUTTON_A: "South",
+            sdl2.SDL_CONTROLLER_BUTTON_B: "East",
+            sdl2.SDL_CONTROLLER_BUTTON_X: "West",
+            sdl2.SDL_CONTROLLER_BUTTON_Y: "North",
+            sdl2.SDL_CONTROLLER_BUTTON_DPAD_UP: "Up",
+            sdl2.SDL_CONTROLLER_BUTTON_DPAD_DOWN: "Down",
+            sdl2.SDL_CONTROLLER_BUTTON_DPAD_LEFT: "Left",
+            sdl2.SDL_CONTROLLER_BUTTON_DPAD_RIGHT: "Right",
+            sdl2.SDL_CONTROLLER_BUTTON_LEFTSHOULDER: "LB",
+            sdl2.SDL_CONTROLLER_AXIS_TRIGGERLEFT: "LT",
+            sdl2.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: "RB",
+            sdl2.SDL_CONTROLLER_AXIS_TRIGGERRIGHT: "RT",
         }
         return button_names.get(button, "UNKNOWN")
 
