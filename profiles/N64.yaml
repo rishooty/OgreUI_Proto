@@ -1,0 +1,56 @@
+name: "Nintendo 64"
+mappings:
+  XBOX:
+    buttons:
+      A:
+        sdl_button: "B"
+        color: "#0000FF" # blue in hex
+        label: "A"
+      B:
+        sdl_button: "A"
+        color: "#00FF00" # green in hex
+        label: "B"
+    axes:
+      right_x:
+        sdl_axis: "RIGHTX"
+        positive:
+          color: "#FFFF00" # yellow in hex
+          label: "C→"
+        negative:
+          color: "#FFFF00" # yellow in hex
+          label: "C←"
+      right_y:
+        sdl_axis: "RIGHTY"
+        positive:
+          color: "#FFFF00" # yellow in hex
+          label: "C↓"
+        negative:
+          color: "#FFFF00" # yellow in hex
+          label: "C↑"
+  PS:
+    buttons:
+      X:
+        sdl_button: "A"
+        color: "blue"
+        label: "A"
+      square:
+        sdl_button: "X"
+        color: "green"
+        label: "B"
+    axes:
+      right_x:
+        sdl_axis: "RIGHTX"
+        positive:
+          color: "#FFFF00" # yellow in hex
+          label: "C→"
+        negative:
+          color: "#FFFF00" # yellow in hex
+          label: "C←"
+      right_y:
+        sdl_axis: "RIGHTY"
+        positive:
+          color: "#FFFF00" # yellow in hex
+          label: "C↓"
+        negative:
+          color: "#FFFF00" # yellow in hex
+          label: "C↑"
