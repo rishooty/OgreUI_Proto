@@ -1,0 +1,5 @@
+name: "Hotkey Legend"
+Guide:
+  image: "legends/donkeyos.png"
+  fallback: "Back"
+Start: "legends/otherlegend.png"
