@@ -5,8 +5,8 @@ from gi.repository import Gtk, GLib
 import threading
 
 class ControllerOverlayApp:
-    def __init__(self, profile_name=None):
-        self.controller_manager = ControllerManager(profile_name)
+    def __init__(self, profile_name=None,forced_layout=None):
+        self.controller_manager = ControllerManager(profile_name, forced_layout)
         self.overlays = {}
         self.running = True
 

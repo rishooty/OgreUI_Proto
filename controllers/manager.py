@@ -1,3 +1,4 @@
+# manager.py
 import sdl2
 import sdl2.ext
 import yaml
@@ -5,12 +6,13 @@ from pathlib import Path
 import sys
 
 class ControllerManager:
-    def __init__(self, profile_name=None):
+    def __init__(self, profile_name=None, forced_layout=None):
         if sdl2.SDL_WasInit(sdl2.SDL_INIT_GAMECONTROLLER) == 0:
             sdl2.SDL_Init(sdl2.SDL_INIT_GAMECONTROLLER)
         self.controllers = {}
         self.profiles = {}
         self.active_profile = None
+        self.forced_layout = forced_layout
         self.load_profiles(profile_name)
 
     def detect_controllers(self):
@@ -25,10 +27,10 @@ class ControllerManager:
                     if joy_id not in self.controllers:  # Only add if not already present
                         self.controllers[joy_id] = {
                             "controller": controller,
-                            "type": None,  # Will be set during detection
+                            "type": self.forced_layout,  # Use forced layout if available
                             "overlay": None  # Will be set when overlay is created
                         }
-                        print(f"Controller {joy_id} connected")  # Debug output
+                        print(f"Controller {joy_id} connected with type: {self.forced_layout or 'auto'}")
 
     def __del__(self):
         # Clean up controllers
@@ -72,3 +74,13 @@ class ControllerManager:
             # If no profile specified, use the first one found
             self.active_profile = list(self.profiles.keys())[0]
             print(f"No profile specified. Using default: {self.active_profile}")
+
+        # Validate forced layout if provided
+        if self.forced_layout:
+            if self.active_profile not in self.profiles:
+                print(f"Error: Active profile '{self.active_profile}' not found")
+                sys.exit(1)
+            if self.forced_layout not in self.profiles[self.active_profile]["mappings"]:
+                print(f"Error: Layout '{self.forced_layout}' not found in profile '{self.active_profile}'")
+                print(f"Available layouts: {list(self.profiles[self.active_profile]['mappings'].keys())}")
+                sys.exit(1)
